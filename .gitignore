@@ -1,2 +1,16 @@
-.env
+# Secrets (copy backend/.env.example to backend/.env)
+.env*
+!.env.example
+
+# Python
 venv/
+__pycache__/
+*.pyc
+*.db
+
+# Node
+node_modules
+dist
+
+# OS
+.DS_Store

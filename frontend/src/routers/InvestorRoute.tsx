@@ -1,15 +1,15 @@
 import { type ReactNode, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import CenteredSpinner from "../components/CenteredSpinner";
-import { URLS } from "../src/config/navigation";
+import { URLS } from "../config/navigation";
 
 import { fetchAuthSession } from "aws-amplify/auth";
 
-interface FirmProps {
+interface InvestorProps {
     children: ReactNode;
 }
 
-export function FirmRoute({ children }: FirmProps) {
+export function InvestorRoute({ children }: InvestorProps) {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(true);
     const [allowed, setAllowed] = useState(false);
@@ -20,10 +20,10 @@ export function FirmRoute({ children }: FirmProps) {
                 const session = await fetchAuthSession();
                 const groups =
                     session.tokens?.accessToken.payload["cognito:groups"];
-                if (Array.isArray(groups) && groups.includes("Firm")) {
+                if (Array.isArray(groups) && groups.includes("Investor")) {
                     setAllowed(true);
                 } else if (Array.isArray(groups)) {
-                    navigate(URLS.investorHomePage, { replace: true });
+                    navigate(URLS.firmHomePage, { replace: true });
                 } else {
                     navigate(URLS.homePage, { replace: true });
                 }

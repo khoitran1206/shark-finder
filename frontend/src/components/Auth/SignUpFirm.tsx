@@ -1,13 +1,12 @@
-// SignUpInvestor.tsx (works for Investor OR Firm; pass role prop)
-// Preconditions:
-// 1) Amplify.configure({... Auth: { Cognito: { userPoolId, userPoolClientId }}}) is already called.
-// 2) Your Post confirmation Lambda reads event.request.clientMetadata.role and allowlists ["Investor","Firm"].
+// SignUpFirm.tsx
+// Email + password sign-up with OTP confirmation.
+// Sends clientMetadata.role = "Firm" so your PostConfirmation Lambda adds the user to the Firm group.
 
+import logoSmall from "../../assets/SharkFinderLogoSmall.png";
 import { useState } from "react";
 import { signUp, confirmSignUp, resendSignUpCode, signIn } from "aws-amplify/auth";
 
-type Role = "Investor" | "Firm";
-export default function SignUpInvestor({ role = "Investor" as Role }) {
+export default function SignUpFirm() {
   const [step, setStep] = useState<"SIGN_UP" | "CONFIRM">("SIGN_UP");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -19,17 +18,15 @@ export default function SignUpInvestor({ role = "Investor" as Role }) {
     e.preventDefault();
     setErr(null); setLoading(true);
     try {
-      const { nextStep } = await signUp({
+      await signUp({
         username: email,
-        password,                               // email+password account
+        password,
         options: {
-          userAttributes: { email },            // required when email is the username
-          clientMetadata: { role },             // <-- sent to Lambda PostConfirmation
+          userAttributes: { email },
+          clientMetadata: { role: "Firm" }, // critical: used by your Lambda trigger
         },
       });
-      // For email verification, Cognito expects confirm
-      if (nextStep.signUpStep === "CONFIRM_SIGN_UP") setStep("CONFIRM");
-      else setStep("CONFIRM");
+      setStep("CONFIRM"); // email verification requires confirm
     } catch (ex: any) {
       setErr(ex?.message ?? "Sign up failed");
     } finally {
@@ -41,19 +38,14 @@ export default function SignUpInvestor({ role = "Investor" as Role }) {
     e.preventDefault();
     setErr(null); setLoading(true);
     try {
-      // OTP emailed by Cognito; confirm account
-await confirmSignUp({
-  username: email,
-  confirmationCode: code.trim(),
-  options: { clientMetadata: { role } }, // "Investor" by default, or "Firm" if passed
-});
-
-      // Optional: auto sign-in after successful confirmation
+      await confirmSignUp({
+        username: email,
+        confirmationCode: code.trim(),
+        options: { clientMetadata: { role: "Firm" } },
+      });
       await signIn({ username: email, password });
       window.location.reload();
-
-      // Navigate as you wish (uncomment if you use a router)
-      // window.location.href = "/app";
+      // window.location.href = "/app"; // or navigate(...)
     } catch (ex: any) {
       setErr(ex?.message ?? "Confirmation failed");
     } finally {
@@ -64,7 +56,7 @@ await confirmSignUp({
   async function handleResend() {
     setErr(null); setLoading(true);
     try {
-      await resendSignUpCode({ username: email }); // resend OTP to email
+      await resendSignUpCode({ username: email });
     } catch (ex: any) {
       setErr(ex?.message ?? "Resend failed");
     } finally {
@@ -77,16 +69,16 @@ await confirmSignUp({
       <div className="sm:mx-auto sm:w-full sm:max-w-sm">
         <img
           alt="Your Company"
-          src="../../src/assets/SharkFinderLogoSmall.png"
+          src={logoSmall}
           className="mx-auto h-10 w-auto dark:hidden"
         />
         <img
           alt="Your Company"
-          src="../../src/assets/SharkFinderLogoSmall.png"
+          src={logoSmall}
           className="mx-auto h-10 w-auto not-dark:hidden"
         />
         <h2 className="mt-10 text-center text-2xl/9 font-bold tracking-tight text-gray-900 dark:text-white">
-          {step === "SIGN_UP" ? `Create your ${role} account` : "Confirm your email"}
+          {step === "SIGN_UP" ? "Create your Firm account" : "Confirm your email"}
         </h2>
       </div>
 

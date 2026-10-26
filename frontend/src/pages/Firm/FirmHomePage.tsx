@@ -3,8 +3,8 @@ import { signOut } from "aws-amplify/auth";
 import { useNavigate } from "react-router-dom";
 import apiClient from "../../services/api-client";
 import Navbar from "../../components/Navbar/Navbar";
-import { Globe } from "../../../frontend/src/components/ui/globe";
-import { URLS } from "../../src/config/navigation";
+import { Globe } from "../../components/ui/globe";
+import { URLS } from "../../config/navigation";
 
 import MatchFirmToInvestorsList from "../../components/MatchFirmToInvestorsList";
 

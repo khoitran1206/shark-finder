@@ -1,11 +1,12 @@
 // HomePage.tsx
-import { Globe } from "../../../frontend/src/components/ui/globe";
+import logo from "../../assets/SharkFinderLogo.png";
+import { Globe } from "../../components/ui/globe";
 
 export default function HomePage() {
   return (
     <div className="relative min-h-svh w-full overflow-hidden rounded-lg border px-6 py-12 md:px-40 md:pt-12 md:pb-60">
       <img
-  src="../../src/assets/SharkFinderLogo.png"        // put your image in /public/assets/
+  src={logo}
   alt="Shark Finder"
   className="mx-auto w-[min(90vw,48rem)] select-none pointer-events-none"
 />

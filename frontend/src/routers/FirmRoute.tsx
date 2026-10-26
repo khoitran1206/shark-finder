@@ -1,40 +1,40 @@
 import { type ReactNode, useEffect, useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import CenteredSpinner from "../components/CenteredSpinner";
-import { URLS } from "../src/config/navigation";
+import { URLS } from "../config/navigation";
+
 import { fetchAuthSession } from "aws-amplify/auth";
 
-interface PublicProps {
+interface FirmProps {
     children: ReactNode;
 }
 
-export function PublicRoute({ children }: PublicProps) {
+export function FirmRoute({ children }: FirmProps) {
     const navigate = useNavigate();
-    const location = useLocation();
     const [loading, setLoading] = useState(true);
     const [allowed, setAllowed] = useState(false);
 
     useEffect(() => {
-        async function checkSession() {
+        async function checkAdmin() {
             try {
                 const session = await fetchAuthSession();
                 const groups =
                     session.tokens?.accessToken.payload["cognito:groups"];
-                if (Array.isArray(groups) && groups.includes("Investor")) {
-                    navigate(URLS.investorHomePage, { replace: true });
-                } else if (Array.isArray(groups)) {
-                    navigate(URLS.firmHomePage, { replace: true });
-                } else {
+                if (Array.isArray(groups) && groups.includes("Firm")) {
                     setAllowed(true);
+                } else if (Array.isArray(groups)) {
+                    navigate(URLS.investorHomePage, { replace: true });
+                } else {
+                    navigate(URLS.homePage, { replace: true });
                 }
             } catch {
-                setAllowed(true);
+                navigate(URLS.homePage, { replace: true });
             } finally {
                 setLoading(false);
             }
         }
-        checkSession();
-    }, [navigate, location.pathname]);
+        checkAdmin();
+    }, [navigate]);
 
     if (loading) return <CenteredSpinner />;
     return <>{allowed ? children : null}</>;

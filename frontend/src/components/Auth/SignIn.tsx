@@ -1,6 +1,7 @@
 // SignInInvestor.tsx
 // Email + password sign-in (Amplify v6). Includes Forgot Password (request + confirm).
 
+import logoSmall from "../../assets/SharkFinderLogoSmall.png";
 import { useState } from "react";
 import {
   signIn,
@@ -74,12 +75,12 @@ export default function SignIn() {
       <div className="sm:mx-auto sm:w-full sm:max-w-sm">
         <img
           alt="Your Company"
-          src="../../src/assets/SharkFinderLogoSmall.png"
+          src={logoSmall}
           className="mx-auto h-10 w-auto dark:hidden"
         />
         <img
           alt="Your Company"
-          src="../../src/assets/SharkFinderLogoSmall.png"
+          src={logoSmall}
           className="mx-auto h-10 w-auto not-dark:hidden"
         />
         <h2 className="mt-10 text-center text-2xl/9 font-bold tracking-tight text-gray-900 dark:text-white">

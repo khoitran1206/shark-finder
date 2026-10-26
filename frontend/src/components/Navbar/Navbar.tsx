@@ -1,4 +1,5 @@
-import { Disclosure, DisclosureButton, DisclosurePanel, Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/react";
+import logoSmall from "../../assets/SharkFinderLogoSmall.png";
+import { Disclosure, DisclosurePanel, Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/react";
 import { useAuthenticator } from "@aws-amplify/ui-react";
 import { useState } from "react";
 import { signOut } from "aws-amplify/auth";
@@ -34,7 +35,7 @@ export default function Navbar() {
             <div className="flex shrink-0 items-center">
               <img
                 alt="Your Company"
-                src="../../src/assets/SharkFinderLogoSmall.png"
+                src={logoSmall}
                 className="h-8 w-auto"
               />
             </div>

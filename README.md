@@ -34,7 +34,8 @@ Our platform helps startups find the right investors for their stage, industry, 
 ## 📁 Layout
 
 ```
-backend/    FastAPI app (main.py), models + matching in app/, SQL migrations, dev scripts
+backend/    FastAPI app: main.py (wiring), app/routers/ (endpoints), app/services/ (Whisper + Gemini),
+            app/match.py (scoring), app/auth.py (Cognito token check), app/models/, tests/, migrations, scripts
 frontend/   React + Vite + Tailwind; auth via AWS Amplify (Cognito)
 docker-compose.yml   runs both services
 ```
@@ -45,7 +46,7 @@ docker-compose.yml   runs both services
 | --- | --- | --- |
 | `DATABASE_URL` | `backend/.env` | Postgres URL. Unset = local SQLite at `backend/app/dev.db` |
 | `GEMINI_API_KEY` | `backend/.env` | Required; backend won't start without it |
-| Whisper model size | `backend/main.py` (`WHISPER_SIZE`) | `small`, hardcoded |
+| Whisper model size | `backend/app/services/transcription.py` (`WHISPER_SIZE`) | `small`, hardcoded |
 | CORS origins | `backend/main.py` | `localhost:5173` / `127.0.0.1:5173`, hardcoded |
 | API base URL | `frontend/services/api-client.ts` | `http://127.0.0.1:8000/`, hardcoded |
 | Cognito pool + client IDs | `frontend/src/main.tsx` | hardcoded; `frontend/amplify_outputs.json` is also imported by `frontend/src/amplify.ts` and is currently a stub |

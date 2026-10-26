@@ -4,6 +4,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from app.auth import get_current_user
 from app.database import get_db
 from app.models.investor import Investor
 from app.models.firm import Firm
@@ -155,15 +156,12 @@ def format_amount(amount: float) -> str:
 @router.get("/firms/{firm_id}/matching-investors")
 def get_matching_investors(
     firm_id: UUID,
+    user: UUID = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """
-    Get top N investors that match with a specific firm.
-
-    - **firm_id**: ID of the firm to find matches for
-    - **limit**: Maximum number of matches to return (default: 10)
-    - **min_score**: Minimum match score threshold (0-100, default: 0)
-    """
+    """Top 5 investors matching the signed-in firm (firm_id must be the caller's own id)."""
+    if firm_id != user:
+        raise HTTPException(status_code=403, detail="Forbidden")
     # Get the firm
     firm = db.query(Firm).filter(Firm.cognito_sub == firm_id).first()
     if not firm:
@@ -196,15 +194,12 @@ def get_matching_investors(
 @router.get("/investors/{investor_id}/matching-firms")
 def get_matching_firms(
     investor_id: UUID,
+    user: UUID = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """
-    Get top N firms that match with a specific investor.
-
-    - **investor_id**: ID of the investor to find matches for
-    - **limit**: Maximum number of matches to return (default: 10)
-    - **min_score**: Minimum match score threshold (0-100, default: 0)
-    """
+    """Top 5 firms matching the signed-in investor (investor_id must be the caller's own id)."""
+    if investor_id != user:
+        raise HTTPException(status_code=403, detail="Forbidden")
     # Get the investor
     # fetch investor by cognito_sub
     investor = db.query(Investor).filter(Investor.cognito_sub == investor_id).first()

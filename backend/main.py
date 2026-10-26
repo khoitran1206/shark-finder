@@ -1,8 +1,5 @@
 # main.py
 
-# matching utilities and schemas
-from app.match import calculate_investor_match_score
-
 # Standard library
 import json
 import logging
@@ -16,7 +13,6 @@ from uuid import UUID
 import ffmpeg
 import google.generativeai as genai
 from faster_whisper import WhisperModel
-from jose import jwt
 from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -28,7 +24,6 @@ from fastapi import (
     Depends,
     File,
     Form,
-    Header,
     HTTPException,
     UploadFile,
     FastAPI,
@@ -39,6 +34,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr
 
 # Application modules
+from app.auth import get_current_user
 from app.database import Base, engine, get_db
 from app.models.firm import Firm
 from app.models.investor import Investor
@@ -94,39 +90,12 @@ class InvestorCreate(BaseModel):
     meeting_frequency: Optional[Literal["Weekly", "Monthly", "Quarterly"]] = None
 
 
-def _extract_sub_from_auth(authorization: str) -> str:
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Missing/invalid Authorization header")
-    token = authorization.split(" ", 1)[1]
-    try:
-        return jwt.get_unverified_claims(token)["sub"]  # upstream must have verified token
-    except Exception:
-        raise HTTPException(status_code=401, detail="Invalid token")
-
-
-
 @app.post("/investor/create-profile")
 def create_investor(
     payload: InvestorCreate,
-    authorization: str = Header(..., alias="Authorization"),
+    sub: UUID = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    # if not authorization.startswith("Bearer "):
-    #     raise HTTPException(status_code=401, detail="Missing/invalid Authorization header")
-    # token = authorization.split(" ", 1)[1]
-
-    # # Minimal: read sub without network calls (no JWKS). Upstream must have verified the token.
-
-    # print(jwt.get_unverified_claims(token)["sub"])
-
-    # try:
-    #     sub = jwt.get_unverified_claims(token)["sub"]
-    # except Exception:
-    #     raise HTTPException(status_code=401, detail="Invalid token")
-
-
-    sub = _extract_sub_from_auth(authorization)
-
     new_investor = Investor(**payload.dict(), cognito_sub=sub)
     db.add(new_investor)
     try:
@@ -241,17 +210,11 @@ def _to_wav_16k_mono(src_path: str) -> str:
 
 @app.post("/firm/create-profile")
 async def create_firm(
-    authorization: str = Header(..., alias="Authorization"),
+    sub: UUID = Depends(get_current_user),
     file: UploadFile = File(...),
     email: str | None = Form(None),        # <-- receive email here
     db: Session = Depends(get_db),
 ):
-    # auth
-    try:
-        sub = _extract_sub_from_auth(authorization)
-    except Exception:
-        raise HTTPException(status_code=401, detail="Invalid Authorization header")
-
     # validate
     ct = file.content_type or ""
     if not (ct.startswith("audio/") or ct.startswith("video/")):
@@ -379,10 +342,9 @@ async def create_firm(
 
 @app.get("/investor/exists")
 def investor_exists(
-    authorization: str = Header(..., alias="Authorization"),
+    sub: UUID = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    sub = _extract_sub_from_auth(authorization)
     exists = db.execute(
         select(Investor.cognito_sub).where(Investor.cognito_sub == sub)
     ).first() is not None
@@ -391,149 +353,10 @@ def investor_exists(
 
 @app.get("/firm/exists")
 def firm_exists(
-    authorization: str = Header(..., alias="Authorization"),
+    sub: UUID = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    sub = _extract_sub_from_auth(authorization)
     exists = db.execute(
         select(Firm.cognito_sub).where(Firm.cognito_sub == sub)
     ).first() is not None
     return {"exists": exists}
-
-
-@app.get("/investors/")
-def read_investors(db: Session = Depends(get_db)):
-    return db.query(Investor).all()
-
-# @app.post("/firms/")
-# def create_firm(
-#     name: str,
-#     email:str,
-#     risk_tolerance: str ! None = None,
-#     industry: str | None = None,
-#     years_active: int,
-#     num_investments: int | None = None,
-#     board_seat: bool,
-#     location: str,
-#     investment_size: str,
-#     investment_stage: str,
-#     follow_on_rate: bool,
-#     rate_of_return: str,
-#     success_rate:str,
-#     reserved_capital = str,
-#     meeting_frequency = str,
-#     db: Session = Depends(get_db),
-# ):
-#     new_firm = Firm(
-#         name=name,
-#         email=email,
-#         risk_tolerance=risk_tolerance,
-#         industry=industry,
-
-#         aum=aum,
-#         location=location,
-#         num_investments=num_investments,
-#         age=age,
-#     )
-#     db.add(new_firm)
-#     try:
-#         db.commit()
-#         db.refresh(new_firm)
-#         return new_firm
-#     except IntegrityError as e:
-#         db.rollback()
-#         logging.exception("IntegrityError while creating firm")
-#         raise HTTPException(status_code=400, detail=str(e.orig))
-#     except Exception as e:
-#         db.rollback()
-#         logging.exception("Unexpected error while creating firm")
-#         raise HTTPException(status_code=500, detail="Internal Server Error")
-
-@app.get("/firms/")
-def read_firms(db: Session = Depends(get_db)):
-    return db.query(Firm).all()
-
-
-# Match endpoints (moved into main for easier testing)
-@app.get("/firms/{firm_id}/matching-investors")
-def get_matching_investors(
-    firm_id: UUID,
-    db: Session = Depends(get_db)
-):
-    """
-    Get top N investors that match with a specific firm.
-
-    - **firm_id**: ID of the firm to find matches for
-    - **limit**: Maximum number of matches to return (default: 10)
-    - **min_score**: Minimum match score threshold (0-100, default: 0)
-    """
-    # Get the firm
-    firm = db.query(Firm).filter(Firm.cognito_sub == firm_id).first()
-    if not firm:    
-        raise HTTPException(status_code=404, detail="Firm not found")
-
-    # Get all investors and calculate match scores
-    investors = db.query(Investor).all()
-    matches = []
-
-    for investor in investors:
-        score = calculate_investor_match_score(investor, firm)
-
-        matches.append({
-            "investor": {
-                "name": investor.name,
-                "email": investor.email,
-                "num_investments": investor.num_investments,
-                "industry": investor.industry,
-                "location": investor.location,
-            },
-            "match_score": score
-        })
-
-    # Sort by score descending
-    matches.sort(key=lambda x: x["match_score"], reverse=True)
-
-    return matches[:5]
-
-
-@app.get("/investors/{investor_id}/matching-firms")
-def get_matching_firms(
-    investor_id: UUID,
-    db: Session = Depends(get_db)
-):
-    """
-    Get top N firms that match with a specific investor.
-
-    - **investor_id**: ID of the investor to find matches for
-    - **limit**: Maximum number of matches to return (default: 10)
-    - **min_score**: Minimum match score threshold (0-100, default: 0)
-    """
-    # Get the investor
-    # fetch investor by cognito_sub
-    investor = db.query(Investor).filter(Investor.cognito_sub == investor_id).first()
-    if not investor:
-        raise HTTPException(status_code=404, detail="Investor not found")
-
-    # Get all firms and calculate match scores
-    firms = db.query(Firm).all()
-    matches = []
-
-    for firm in firms:
-        score = calculate_investor_match_score(investor, firm)
-
-        matches.append({
-            "firm": {
-                "name": firm.name,
-                "email": firm.email,
-                "industry": firm.industry,
-                "location": firm.location,
-                "risk_tolerance": firm.risk_tolerance
-            },
-            "match_score": score
-        })
-
-    # Sort by score descending
-    matches.sort(key=lambda x: x["match_score"], reverse=True)
-
-    return matches[:5]
-

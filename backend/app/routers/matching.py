@@ -9,7 +9,7 @@ from app.match import calculate_investor_match_score
 from app.models.firm import Firm
 from app.models.investor import Investor
 
-router = APIRouter()
+router = APIRouter(tags=["matching"])
 
 
 @router.get("/firms/{firm_id}/matching-investors")

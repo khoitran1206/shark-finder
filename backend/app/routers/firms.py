@@ -12,7 +12,7 @@ from app.database import get_db
 from app.models.firm import Firm
 from app.services import transcription
 
-router = APIRouter()
+router = APIRouter(tags=["firms"])
 
 
 @router.post("/firm/create-profile")
@@ -22,6 +22,11 @@ async def create_firm(
     email: str | None = Form(None),        # <-- receive email here
     db: Session = Depends(get_db),
 ):
+    """Create the signed-in user's firm profile from a recorded pitch.
+
+    Send an audio/* or video/* `file`. It is transcribed with Whisper and Gemini extracts the profile fields.
+    Fails with 500 if no firm name could be extracted.
+    """
     # validate
     ct = file.content_type or ""
     if not (ct.startswith("audio/") or ct.startswith("video/")):
@@ -71,6 +76,7 @@ def firm_exists(
     sub: UUID = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    """Whether the signed-in user already has a firm profile."""
     exists = db.execute(
         select(Firm.cognito_sub).where(Firm.cognito_sub == sub)
     ).first() is not None

@@ -85,3 +85,23 @@ def test_cors_origins_come_from_config():
         headers={"Origin": "https://evil.example.com", "Access-Control-Request-Method": "GET"},
     )
     assert "access-control-allow-origin" not in r.headers
+
+
+def test_firm_profile_without_a_name_is_rejected_not_stored(monkeypatch):
+    """If Gemini finds nothing (empty profile), the required name makes the request fail."""
+    empty = {k: None for k in ("name", "risk_tolerance", "industry", "years_active", "num_investments",
+                               "board_seat", "location", "investment_size", "investment_stage",
+                               "follow_on_rate", "rate_of_return", "success_rate", "reserved_capital",
+                               "meeting_frequency")}
+    monkeypatch.setattr(transcription, "to_wav_16k_mono", lambda p: p)
+    monkeypatch.setattr(transcription, "transcribe", lambda p: ("", SimpleNamespace(language="en", duration=0.0)))
+    monkeypatch.setattr(transcription, "extract_firm_fields", lambda t: dict(empty))
+
+    as_user(uuid.uuid4())
+    r = client.post(
+        "/firm/create-profile",
+        files={"file": ("pitch.wav", b"fake", "audio/wav")},
+        data={"email": "noname@example.com"},
+    )
+    assert r.status_code == 500
+    assert client.get("/firm/exists").json() == {"exists": False}

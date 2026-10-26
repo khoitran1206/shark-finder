@@ -4,7 +4,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import CORS_ORIGINS
 from app.routers import firms, investors, matching
 
-app = FastAPI()
+app = FastAPI(
+    title="Shark Finder API",
+    description="Matches investors with startups. Send a Cognito access token as `Authorization: Bearer <token>`.",
+)
 
 app.add_middleware(
     CORSMiddleware,

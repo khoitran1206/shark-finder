@@ -10,7 +10,7 @@ from app.database import get_db
 from app.models.investor import Investor
 from app.schemas import InvestorCreate
 
-router = APIRouter()
+router = APIRouter(tags=["investors"])
 
 
 @router.post("/investor/create-profile")
@@ -19,6 +19,7 @@ def create_investor(
     sub: UUID = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    """Create the signed-in user's investor profile. 400 if one already exists (or the name/email is taken)."""
     new_investor = Investor(**payload.dict(), cognito_sub=sub)
     db.add(new_investor)
     try:
@@ -38,6 +39,7 @@ def investor_exists(
     sub: UUID = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    """Whether the signed-in user already has an investor profile."""
     exists = db.execute(
         select(Investor.cognito_sub).where(Investor.cognito_sub == sub)
     ).first() is not None

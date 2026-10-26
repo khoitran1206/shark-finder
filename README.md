@@ -1,17 +1,16 @@
 # 🦈 Shark Finder
 
-**Shark Finder** is a web application that connects **investors** and **startups/firms** through an **advanced AI-powered matching algorithm**.  
+**Shark Finder** is a web application that connects **investors** and **startups/firms** through a **scored matching algorithm**, with **AI-assisted onboarding** for startups.  
 Our platform helps startups find the right investors for their stage, industry, and funding goals — while enabling investors to discover high-potential ventures that align with their portfolio interests.
 
 ---
 
 ## 🚀 Features
 
-- 🤝 **Smart Matching Algorithm** — uses AI to connect investors with startups based on goals, sectors, and metrics
-- 🧠 **AI-Driven Insights** — powered by **Google Gemini** and **faster-whisper** for intelligent recommendations and data analysis
-- 💬 **Seamless Communication** — in-app chat and profile discovery for easy investor-founder interactions
-- 📊 **Dynamic Dashboards** — visualize funding opportunities and connections in real time
-- ☁️ **Scalable Backend** — built with FastAPI and Supabase for speed and reliability
+- 🤝 **Scored matching** — compares investor and firm profiles (industry, risk, stage, size, location and more) and shows each side their top 5 matches. See [how matching works](docs/matching.md)
+- 🎙️ **AI-assisted onboarding** — a firm records a short pitch; **faster-whisper** transcribes it and **Google Gemini** extracts the profile fields
+- 🔐 **Role-based sign-in** — investors and firms sign up and sign in with AWS Cognito. See [authentication](docs/auth.md)
+- ☁️ **Backend** — FastAPI and Postgres (Supabase), with Alembic migrations
 
 ---
 
@@ -33,9 +32,17 @@ Our platform helps startups find the right investors for their stage, industry, 
 
 ---
 
+## 📚 Documentation
+
+- [Architecture](docs/architecture.md) — components, main flows and the API endpoint list
+- [How matching works](docs/matching.md) — every scoring rule and its quirks
+- [Authentication and roles](docs/auth.md) — sign-in flow, token checks, and what a new Cognito pool needs
+- API reference: run the backend and open http://localhost:8000/docs
+
 ## 📁 Layout
 
 ```
+docs/       architecture, matching and auth notes
 backend/    FastAPI app: main.py (wiring), app/routers/ (endpoints), app/services/ (Whisper + Gemini),
             app/match.py (scoring), app/auth.py (Cognito token check), app/models/, alembic/ (migrations), tests/
 frontend/   React + Vite + Tailwind; auth via AWS Amplify (Cognito)

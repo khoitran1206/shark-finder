@@ -2,11 +2,10 @@
 
 # Standard library
 import json
-import logging
 import os
 import re
 import tempfile
-from typing import Any, Dict, List, Optional, Literal
+from typing import Any, Dict, Optional, Literal
 from uuid import UUID
 
 # Third-party libraries
@@ -19,8 +18,6 @@ from sqlalchemy.orm import Session
 
 # FastAPI
 from fastapi import (
-    APIRouter,
-    Body,
     Depends,
     File,
     Form,
@@ -36,6 +33,7 @@ from pydantic import BaseModel, EmailStr
 # Application modules
 from app.auth import get_current_user
 from app.database import Base, engine, get_db
+from app.match import router as match_router
 from app.models.firm import Firm
 from app.models.investor import Investor
 
@@ -53,20 +51,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# include match router if present (safe import)
-try:
-    from app.match import router as match_router
-    app.include_router(match_router)
-except Exception:
-    pass
+app.include_router(match_router)
 
-# include match router if available
-try:
-    from app.match import router as match_router
-    app.include_router(match_router)
-except Exception:
-    # keep app usable even if import fails in dev
-    pass
 
 @app.get("/")
 def read_root():
@@ -110,12 +96,8 @@ def create_investor(
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
 
-
-
-
-# THIS IS THE TRANSCRIPTION STUFFF!!!!!
-
-# --- configure once (idempotent) ---
+# --- transcription + firm profile extraction ---
+# configure once (idempotent)
 API_KEY = os.getenv("GEMINI_API_KEY")
 if not API_KEY:
     raise RuntimeError("GEMINI_API_KEY not set")

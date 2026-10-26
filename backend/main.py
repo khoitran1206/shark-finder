@@ -2,11 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import CORS_ORIGINS
-from app.database import Base, engine
 from app.routers import firms, investors, matching
-
-# Create all tables (the routers above import the models, so they are registered)
-Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 

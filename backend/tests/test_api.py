@@ -71,3 +71,17 @@ def test_firm_flow_and_matching(monkeypatch):
     as_user(INVESTOR_ID)
     firms = client.get(f"/investors/{INVESTOR_ID}/matching-firms").json()
     assert firms and firms[0]["firm"]["name"] == "Acme"
+
+
+def test_cors_origins_come_from_config():
+    from app.config import CORS_ORIGINS
+    r = client.options(
+        "/investor/exists",
+        headers={"Origin": CORS_ORIGINS[0], "Access-Control-Request-Method": "GET"},
+    )
+    assert r.headers.get("access-control-allow-origin") == CORS_ORIGINS[0]
+    r = client.options(
+        "/investor/exists",
+        headers={"Origin": "https://evil.example.com", "Access-Control-Request-Method": "GET"},
+    )
+    assert "access-control-allow-origin" not in r.headers

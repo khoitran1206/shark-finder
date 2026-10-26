@@ -45,16 +45,22 @@ docker-compose.yml   runs both services
 | Setting | Where | Default / notes |
 | --- | --- | --- |
 | `DATABASE_URL` | `backend/.env` | Postgres URL. Unset = local SQLite at `backend/app/dev.db` |
-| `GEMINI_API_KEY` | `backend/.env` | Required; backend won't start without it |
-| Whisper model size | `backend/app/services/transcription.py` (`WHISPER_SIZE`) | `small`, hardcoded |
-| CORS origins | `backend/main.py` | `localhost:5173` / `127.0.0.1:5173`, hardcoded |
-| API base URL | `frontend/services/api-client.ts` | `http://127.0.0.1:8000/`, hardcoded |
-| Cognito pool + client IDs | `frontend/src/main.tsx` | hardcoded; `frontend/amplify_outputs.json` is also imported by `frontend/src/amplify.ts` and is currently a stub |
+| `GEMINI_API_KEY` | `backend/.env` | Secret. Required for firm recordings; read on first use, so the app starts without it |
+| `GEMINI_MODEL` | `backend/.env` | `gemini-2.5-flash` |
+| `WHISPER_SIZE` | `backend/.env` | `small`. The model loads on the first recording (slow once) |
+| `CORS_ORIGINS` | `backend/.env` | Comma-separated. `http://localhost:5173,http://127.0.0.1:5173` |
+| `COGNITO_REGION`, `COGNITO_USER_POOL_ID`, `COGNITO_CLIENT_ID` | `backend/.env` | Public IDs used to verify login tokens. Default to the current pool |
+| `VITE_API_URL` | `frontend/.env` | Backend URL. `http://127.0.0.1:8000/` |
+| `VITE_COGNITO_USER_POOL_ID`, `VITE_COGNITO_CLIENT_ID` | `frontend/.env` | Must match the backend `COGNITO_*` values. Default to the current pool |
 
-Secrets live only in `backend/.env` (git-ignored). Start from the template:
+All settings are optional except the Gemini key. Only `GEMINI_API_KEY` and a Postgres `DATABASE_URL` are secrets; the Cognito IDs are public.
+Backend code reads everything through `backend/app/config.py`.
+
+Secrets live only in `backend/.env` (git-ignored). Start from the templates:
 
 ```bash
 cp backend/.env.example backend/.env
+cp frontend/.env.example frontend/.env   # optional
 ```
 
 ## ▶️ Run locally

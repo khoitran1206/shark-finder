@@ -34,8 +34,8 @@ import { FirmRoute } from "../routers/FirmRoute.tsx";
 Amplify.configure({
   Auth: {
     Cognito: {
-      userPoolId: "us-east-2_PhoO99PTx",
-      userPoolClientId: "3ipsjhg4ulpgbjfmb6nabvuml7",
+      userPoolId: import.meta.env.VITE_COGNITO_USER_POOL_ID ?? "us-east-2_PhoO99PTx",
+      userPoolClientId: import.meta.env.VITE_COGNITO_CLIENT_ID ?? "3ipsjhg4ulpgbjfmb6nabvuml7",
     }
   }
 });

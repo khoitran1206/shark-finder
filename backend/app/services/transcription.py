@@ -1,20 +1,32 @@
 import json
 import os
 import re
+from functools import lru_cache
 from typing import Any, Dict, Optional
 
 import ffmpeg
 import google.generativeai as genai
-from faster_whisper import WhisperModel
+import faster_whisper
+
+from app.config import GEMINI_MODEL, WHISPER_SIZE
 
 # --- transcription + firm profile extraction ---
-# configure once (idempotent)
-API_KEY = os.getenv("GEMINI_API_KEY")
-if not API_KEY:
-    raise RuntimeError("GEMINI_API_KEY not set")
-genai.configure(api_key=API_KEY)
 
-_MODEL_ID = "gemini-2.5-flash"  # or "gemini-1.5-flash-002" for speed
+
+@lru_cache(maxsize=1)
+def _configure_gemini() -> None:
+    """Configure Gemini on first use so the app can start (and be tested) without a key."""
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        raise RuntimeError("GEMINI_API_KEY not set")
+    genai.configure(api_key=api_key)
+
+
+@lru_cache(maxsize=1)
+def get_whisper_model():
+    """Load the Whisper model on first use (it is large and slow to load)."""
+    # device="auto" uses GPU if available; compute_type="auto" picks best precision
+    return faster_whisper.WhisperModel(WHISPER_SIZE, device="auto", compute_type="auto")
 
 # --- lightweight normalizers (inline; no external deps) ---
 _RISK_MAP = {
@@ -85,10 +97,6 @@ def _to_int(val: Any, lo: int = 0, hi: int = 1_000_000) -> Optional[int]:
         return iv if lo <= iv <= hi else None
 
 
-WHISPER_SIZE = "small"
-# device="auto" uses GPU if available; compute_type="auto" picks best precision
-whisper_model = WhisperModel(WHISPER_SIZE, device="auto", compute_type="auto")
-
 def to_wav_16k_mono(src_path: str) -> str:
     """Convert any audio/video to 16 kHz mono WAV for Whisper."""
     out_path = src_path + ".wav"
@@ -104,7 +112,7 @@ def to_wav_16k_mono(src_path: str) -> str:
 
 def transcribe(wav_path: str):
     """Transcribe a 16 kHz mono WAV. Returns (transcript, info)."""
-    segments, info = whisper_model.transcribe(
+    segments, info = get_whisper_model().transcribe(
         wav_path,
         language=None,        # auto-detect
         vad_filter=True,      # helps on noisy/pauses
@@ -135,8 +143,9 @@ def extract_firm_fields(transcript: str) -> Dict[str, Any]:
     )
     prompt = f"Transcript:\n```\n{transcript}\n```\nJSON only."
 
+    _configure_gemini()
     model = genai.GenerativeModel(
-        _MODEL_ID,
+        GEMINI_MODEL,
         system_instruction=sys,
         generation_config={"temperature": 0.1, "response_mime_type": "application/json"},
     )

@@ -34,6 +34,11 @@ def _fake_model(response_text=None, raises=False):
     return FakeModel
 
 
+@pytest.fixture(autouse=True)
+def _no_gemini_setup(monkeypatch):
+    monkeypatch.setattr(t, "_configure_gemini", lambda: None)
+
+
 def test_extract_firm_fields_normalizes(monkeypatch):
     reply = {"name": "  Acme  ", "risk_tolerance": "aggressive", "investment_size": "2.5M",
              "years_active": "12 years", "board_seat": "yes", "meeting_frequency": "monthly"}
@@ -52,3 +57,26 @@ def test_extract_firm_fields_falls_back_to_empty_profile(monkeypatch):
     monkeypatch.setattr(t.genai, "GenerativeModel", _fake_model(raises=True))
     out = t.extract_firm_fields("transcript")
     assert out["name"] is None and all(v is None for v in out.values())
+
+
+def test_import_does_not_load_models_or_need_a_key(monkeypatch):
+    # conftest removed GEMINI_API_KEY before importing the app; nothing was loaded either.
+    assert t.get_whisper_model.cache_info().currsize == 0
+
+
+def test_missing_gemini_key_fails_on_use_not_on_import(monkeypatch):
+    monkeypatch.undo()
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    t._configure_gemini.cache_clear()
+    with pytest.raises(RuntimeError, match="GEMINI_API_KEY"):
+        t.extract_firm_fields("transcript")
+
+
+def test_whisper_model_loaded_once_with_configured_size(monkeypatch):
+    calls = []
+    monkeypatch.setattr(t.faster_whisper, "WhisperModel", lambda *a, **k: calls.append((a, k)) or object())
+    t.get_whisper_model.cache_clear()
+    first, second = t.get_whisper_model(), t.get_whisper_model()
+    assert first is second and len(calls) == 1
+    assert calls[0][0][0] == t.WHISPER_SIZE
+    t.get_whisper_model.cache_clear()

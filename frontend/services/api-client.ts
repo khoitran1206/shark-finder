@@ -1,8 +1,7 @@
 import axios from "axios";
 import { fetchAuthSession } from "aws-amplify/auth";
 
-const baseURL =
-  "http://127.0.0.1:8000/";
+const baseURL = import.meta.env.VITE_API_URL ?? "http://127.0.0.1:8000/";
 
 const controllers = new Map<symbol, AbortController>();
 

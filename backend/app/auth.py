@@ -1,4 +1,3 @@
-import os
 import time
 from uuid import UUID
 
@@ -6,12 +5,10 @@ import httpx
 from fastapi import Header, HTTPException
 from jose import JWTError, jwt
 
-# Defaults are the public identifiers of the existing Cognito pool; override via env.
-REGION = os.getenv("COGNITO_REGION", "us-east-2")
-USER_POOL_ID = os.getenv("COGNITO_USER_POOL_ID", "us-east-2_PhoO99PTx")
-CLIENT_ID = os.getenv("COGNITO_CLIENT_ID", "3ipsjhg4ulpgbjfmb6nabvuml7")
+from app.config import COGNITO_CLIENT_ID as CLIENT_ID
+from app.config import COGNITO_REGION, COGNITO_USER_POOL_ID
 
-ISSUER = f"https://cognito-idp.{REGION}.amazonaws.com/{USER_POOL_ID}"
+ISSUER = f"https://cognito-idp.{COGNITO_REGION}.amazonaws.com/{COGNITO_USER_POOL_ID}"
 JWKS_URL = f"{ISSUER}/.well-known/jwks.json"
 JWKS_TTL_SECONDS = 3600
 

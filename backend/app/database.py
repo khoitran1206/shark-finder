@@ -1,12 +1,10 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 import os
-from dotenv import load_dotenv
 
-load_dotenv()  # loads .env if present
+from app.config import DATABASE_URL
 
-# Read DATABASE_URL from env; if missing, fall back to local sqlite for dev
-DATABASE_URL = os.getenv("DATABASE_URL")
+# If DATABASE_URL is unset, fall back to local sqlite for dev
 if not DATABASE_URL:
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     sqlite_path = os.path.join(BASE_DIR, "./dev.db")

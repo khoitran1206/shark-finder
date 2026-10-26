@@ -1,32 +1,17 @@
-// pages/RecorderPage.tsx
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState } from "react";
 import { fetchUserAttributes, fetchAuthSession } from "aws-amplify/auth";
 import Navbar from "../../components/Navbar";
-import apiClient from "../../services/api-client";
+import LoadingScreen from "../../components/LoadingScreen";
+import PreviewDialog from "../../components/PreviewDialog";
 import MatchFirmToInvestorsList from "../../components/MatchFirmToInvestorsList";
+import apiClient from "../../services/api-client";
+import { useProfileExists } from "../../hooks/useProfileExists";
 
 export default function RecorderPage() {
-  // --- firm exists check ---
-  const [checking, setChecking] = useState(true);
-  const [exists, setExists] = useState<boolean | null>(null);
+  // A failed check leaves `exists` null, which shows the recorder like "no profile"
+  const { checking, exists } = useProfileExists("/firm/exists");
 
-  const runExistsCheck = useCallback(async () => {
-    setChecking(true);
-    try {
-      const res = await apiClient.get("/firm/exists");
-      setExists(Boolean(res?.data?.exists));
-    } catch {
-      setExists(false); // on error, treat as not existing
-    } finally {
-      setChecking(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    runExistsCheck();
-  }, [runExistsCheck]);
-
-  // --- recorder state (unchanged) ---
+  // --- recorder state ---
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -144,9 +129,7 @@ export default function RecorderPage() {
     return (
       <>
         <Navbar />
-        <div className="flex min-h-svh items-center justify-center">
-          <div className="text-sm text-gray-600 dark:text-gray-300">Loading…</div>
-        </div>
+        <LoadingScreen />
       </>
     );
   }
@@ -196,7 +179,7 @@ export default function RecorderPage() {
                       <button
                         onClick={initCamera}
                         type="button"
-                        className="rounded-md cursor-pointer bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-xs inset-ring inset-ring-gray-300 hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 dark:bg白/10 dark:text-white dark:shadow-none dark:inset-ring-white/5 dark:hover:bg-white/20"
+                        className="rounded-md cursor-pointer bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-xs inset-ring inset-ring-gray-300 hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 dark:bg-white/10 dark:text-white dark:shadow-none dark:inset-ring-white/5 dark:hover:bg-white/20"
                       >
                         Enable Camera
                       </button>
@@ -249,57 +232,15 @@ export default function RecorderPage() {
         </div>
 
         {showPreview && (
-          <div
-            className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Recording preview"
-            onKeyDown={(e) => e.key === "Escape" && setShowPreview(false)}
-          >
-            <div className="w-full max-w-3xl rounded-2xl border border-gray-200 bg-white p-4 shadow-2xl dark:border-gray-800 dark:bg-gray-900">
-              <div className="mb-3 flex items-center justify-between">
-                <h3 className="text-lg font-semibold">Preview your pitch</h3>
-                <button
-                  onClick={() => setShowPreview(false)}
-                  className="rounded-md cursor-pointer p-1 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
-                  aria-label="Close preview"
-                  title="Close"
-                >
-                  ✕
-                </button>
-              </div>
-
-              <div className="overflow-hidden rounded-lg">
-                {blobUrl ? (
-                  <video src={blobUrl} controls className="h-auto w-full" />
-                ) : (
-                  <div className="flex h-60 items-center justify-center text-sm text-gray-500">
-                    No preview available
-                  </div>
-                )}
-              </div>
-
-              <div className="mt-4 flex items-center justify-between">
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setShowPreview(false)}
-                    className="rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-700"
-                  >
-                    Re-record
-                  </button>
-                  <button
-                    onClick={submitToBackend}
-                    disabled={uploading || uploaded || !chunksRef.current.length}
-                    className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-                  >
-                    {uploaded ? "Submitted" : uploading ? "Submitting..." : "Submit"}
-                  </button>
-                </div>
-              </div>
-
-              {err && <p className="mt-3 text-sm text-red-600">{err}</p>}
-            </div>
-          </div>
+          <PreviewDialog
+            blobUrl={blobUrl}
+            uploading={uploading}
+            uploaded={uploaded}
+            canSubmit={chunksRef.current.length > 0}
+            err={err}
+            onClose={() => setShowPreview(false)}
+            onSubmit={submitToBackend}
+          />
         )}
       </div>
     </>

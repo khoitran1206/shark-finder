@@ -1,8 +1,9 @@
-import { useEffect, useState, useCallback } from "react";
+import { useState } from "react";
 import { signOut } from "aws-amplify/auth";
 import { useNavigate } from "react-router-dom";
-import apiClient from "../../services/api-client";
+import { useProfileExists } from "../../hooks/useProfileExists";
 import Navbar from "../../components/Navbar/Navbar";
+import LoadingScreen from "../../components/LoadingScreen";
 import { Globe } from "../../components/ui/globe";
 import { URLS } from "../../config/navigation";
 
@@ -11,27 +12,10 @@ import MatchFirmToInvestorsList from "../../components/MatchFirmToInvestorsList"
 export default function FirmHomePage() {
   const nav = useNavigate();
 
-  const [checking, setChecking] = useState(true);
-  const [exists, setExists] = useState<boolean | null>(null);
+  // A failed check leaves `exists` null, which shows the pitch page like "no profile"
+  const { checking, exists } = useProfileExists("/firm/exists");
   const [loggingOut, setLoggingOut] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-
-  const runExistsCheck = useCallback(async () => {
-    setChecking(true);
-    try {
-      const res = await apiClient.get("/firm/exists");
-      setExists(Boolean(res?.data?.exists));
-    } catch (e: any) {
-      // On error, treat as non-existent and proceed normally
-      setExists(false);
-    } finally {
-      setChecking(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    runExistsCheck();
-  }, [runExistsCheck]);
 
   async function handleLogout() {
     setErr(null);
@@ -50,11 +34,7 @@ export default function FirmHomePage() {
     return (
       <>
         <Navbar />
-        <div className="flex min-h-svh items-center justify-center">
-          <div className="text-sm text-gray-600 dark:text-gray-300">
-            Loading…
-          </div>
-        </div>
+        <LoadingScreen />
       </>
     );
   }

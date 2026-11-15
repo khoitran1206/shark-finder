@@ -1,4 +1,3 @@
-import { StrictMode, useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import { Amplify } from "aws-amplify";
@@ -9,33 +8,31 @@ import { URLS } from "./config/navigation.ts";
 import {
     createBrowserRouter,
     RouterProvider,
-    useLocation,
-    Outlet,
 } from "react-router-dom";
 
 
-import NotFoundPage from "../pages/General/NotFoundPage.tsx"
+import NotFoundPage from "./pages/General/NotFoundPage.tsx"
 
 
-import SignUpFirm from "../components/Auth/SignUpFirm"
-import SignUpInvestor from "../components/Auth/SignUpInvestor"
-import SignIn from "../components/Auth/SignIn"
-import HomePage from "../pages/General/HomePage"
-import FirmHomePage from "../pages/Firm/FirmHomePage"
-import RecorderPage from "../pages/Firm/RecorderPage"
-import InvestorHomePage from "../pages/Investor/InvestorHomePage"
+import SignUpFirm from "./components/Auth/SignUpFirm"
+import SignUpInvestor from "./components/Auth/SignUpInvestor"
+import SignIn from "./components/Auth/SignIn"
+import HomePage from "./pages/General/HomePage"
+import FirmHomePage from "./pages/Firm/FirmHomePage"
+import RecorderPage from "./pages/Firm/RecorderPage"
+import InvestorHomePage from "./pages/Investor/InvestorHomePage"
 
 
 
-import { PublicRoute } from "../routers/PublicRoute.tsx";
-import { InvestorRoute } from "../routers/InvestorRoute.tsx";
-import { FirmRoute } from "../routers/FirmRoute.tsx";
+import { PublicRoute } from "./routers/PublicRoute.tsx";
+import { InvestorRoute } from "./routers/InvestorRoute.tsx";
+import { FirmRoute } from "./routers/FirmRoute.tsx";
 
 Amplify.configure({
   Auth: {
     Cognito: {
-      userPoolId: "us-east-2_PhoO99PTx",
-      userPoolClientId: "3ipsjhg4ulpgbjfmb6nabvuml7",
+      userPoolId: import.meta.env.VITE_COGNITO_USER_POOL_ID ?? "us-east-2_PhoO99PTx",
+      userPoolClientId: import.meta.env.VITE_COGNITO_CLIENT_ID ?? "3ipsjhg4ulpgbjfmb6nabvuml7",
     }
   }
 });

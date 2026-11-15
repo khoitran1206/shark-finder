@@ -1,50 +1,35 @@
-from typing import List, Any, Dict, Tuple
-from uuid import UUID
-
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
-
-from app.database import get_db
-from app.models.investor import Investor
 from app.models.firm import Firm
-
-# Router
-router = APIRouter()
+from app.models.investor import Investor
 
 
-def calculate_investor_match_score(investor: Investor, firm: Firm) -> Tuple[float, List[str]]:
-    """Calculate how well an investor matches with a firm.
-
-    Returns (score, reasons)
-    """
+def calculate_investor_match_score(investor: Investor, firm: Firm) -> float:
+    """Score how well an investor matches a firm (higher is better, max 105)."""
     score = 0.0
 
-     # Industry match (15 points)
+    # Industry match (up to 5 points)
     if investor.industry and firm.industry:
         if investor.industry.lower() == firm.industry.lower():
             score += 5
         elif investor.industry.lower() in firm.industry.lower() or firm.industry.lower() in investor.industry.lower():
             score += 3
 
-    # Risk tolerance vs firm stage (10 points)
+    # Risk tolerance (up to 10 points; adjacent levels get 6)
     if investor.risk_tolerance and firm.risk_tolerance:
-        # Heuristic: younger firms (age <5) are higher risk
-        if investor.risk_tolerance.lower() == firm.risk_tolerance.lower():
+        inv_risk = investor.risk_tolerance.lower()
+        firm_risk = firm.risk_tolerance.lower()
+        if inv_risk == firm_risk:
             score += 10
-        elif (investor.risk_tolerance.lower() == 'high' and firm.risk_tolerance == "medium" or
-              investor.risk_tolerance.lower() == 'medium' and firm.risk_tolerance == "high" or
-              investor.risk_tolerance.lower() == 'low' and firm.risk_tolerance == "medium" or
-              investor.risk_tolerance.lower() == 'medium' and firm.risk_tolerance == "low"):
+        elif {inv_risk, firm_risk} in ({'low', 'medium'}, {'medium', 'high'}):
             score += 6
 
-    # Experience level (20 points)
+    # Experience level (up to 5 points)
     if investor.years_active and firm.years_active:
         if investor.years_active >= firm.years_active:
             score += 5
         elif investor.years_active >= firm.years_active * 0.5:
             score += 3
 
-    # Investment size vs firm needs (30 points)
+    # Number of investments vs firm's (up to 15 points)
     if investor.num_investments and firm.num_investments:
         if investor.num_investments <= firm.num_investments:
             score += 15
@@ -53,24 +38,25 @@ def calculate_investor_match_score(investor: Investor, firm: Firm) -> Tuple[floa
         elif investor.num_investments <= firm.num_investments * 2:
             score += 5
 
-    # Board seat preference (15 points)
+    # Board seat preference (10 points)
     if investor.board_seat:
         score += 10
 
 
-    # Location match (20 points)
+    # Location match (10 points)
     if investor.location and firm.location:
         if investor.location.lower() == firm.location.lower():
             score += 10
 
 
-     # Portfolio size (investment_size) and firm's investment count (15 points)
+    # Investment size (up to 10 points)
     if investor.investment_size and firm.investment_size:
         if investor.investment_size >= firm.investment_size:
             score += 10
         elif investor.investment_size >= firm.investment_size * 0.5:
             score += 5
 
+    # Investment stage (5 points)
     if investor.investment_stage and firm.investment_stage:
         if investor.investment_stage.lower() == firm.investment_stage.lower():
             score += 5
@@ -78,8 +64,9 @@ def calculate_investor_match_score(investor: Investor, firm: Firm) -> Tuple[floa
 
     # Follow-on preference (5 points)
     if investor.follow_on_rate:
-            score += 5
+        score += 5
 
+    # Rate of return (up to 10 points)
     if investor.rate_of_return and firm.rate_of_return:
         # small bonus for higher stated ROI strings (heuristic)
         if '%' in investor.rate_of_return and '%' in firm.rate_of_return:
@@ -93,6 +80,7 @@ def calculate_investor_match_score(investor: Investor, firm: Firm) -> Tuple[floa
             except:
                 pass
 
+    # Success rate (5 points)
     if investor.success_rate and firm.success_rate:
         # small bonus for higher stated success rate strings (heuristic)
         if '%' in investor.success_rate and '%' in firm.success_rate:
@@ -105,7 +93,7 @@ def calculate_investor_match_score(investor: Investor, firm: Firm) -> Tuple[floa
                 pass
 
 
-    # Reserved capital
+    # Reserved capital (up to 5 points)
     if investor.reserved_capital and firm.reserved_capital:
         try:
             inv_cap = parse_amount(investor.reserved_capital) if isinstance(investor.reserved_capital, str) else float(investor.reserved_capital)
@@ -118,10 +106,9 @@ def calculate_investor_match_score(investor: Investor, firm: Firm) -> Tuple[floa
             pass
 
 
-    # Meeting frequency preference (10 points)
+    # Meeting frequency (10 points)
     if investor.meeting_frequency and firm.meeting_frequency:
-        # crude heuristic: local firms preferred for frequent meetings
-        if investor.meeting_frequency.lower() == firm.meeting_frequency.lower() :
+        if investor.meeting_frequency.lower() == firm.meeting_frequency.lower():
             score += 10
 
 
@@ -150,86 +137,3 @@ def format_amount(amount: float) -> str:
     elif amount >= 1_000:
         return f"{amount / 1_000:.1f}K"
     return f"{amount:.0f}"
-
-
-@router.get("/firms/{firm_id}/matching-investors")
-def get_matching_investors(
-    firm_id: UUID,
-    db: Session = Depends(get_db)
-):
-    """
-    Get top N investors that match with a specific firm.
-
-    - **firm_id**: ID of the firm to find matches for
-    - **limit**: Maximum number of matches to return (default: 10)
-    - **min_score**: Minimum match score threshold (0-100, default: 0)
-    """
-    # Get the firm
-    firm = db.query(Firm).filter(Firm.cognito_sub == firm_id).first()
-    if not firm:
-        raise HTTPException(status_code=404, detail="Firm not found")
-
-    # Get all investors and calculate match scores
-    investors = db.query(Investor).all()
-    matches = []
-
-    for investor in investors:
-        score = calculate_investor_match_score(investor, firm)
-
-        matches.append({
-            "investor": {
-                "name": investor.name,
-                "email": investor.email,
-                "num_investments": investor.num_investments,
-                "industry": investor.industry,
-                "location": investor.location,
-            },
-            "match_score": score
-        })
-
-    # Sort by score descending
-    matches.sort(key=lambda x: x["match_score"], reverse=True)
-
-    return matches[:5]
-
-
-@router.get("/investors/{investor_id}/matching-firms")
-def get_matching_firms(
-    investor_id: UUID,
-    db: Session = Depends(get_db)
-):
-    """
-    Get top N firms that match with a specific investor.
-
-    - **investor_id**: ID of the investor to find matches for
-    - **limit**: Maximum number of matches to return (default: 10)
-    - **min_score**: Minimum match score threshold (0-100, default: 0)
-    """
-    # Get the investor
-    # fetch investor by cognito_sub
-    investor = db.query(Investor).filter(Investor.cognito_sub == investor_id).first()
-    if not investor:
-        raise HTTPException(status_code=404, detail="Investor not found")
-
-    # Get all firms and calculate match scores
-    firms = db.query(Firm).all()
-    matches = []
-
-    for firm in firms:
-        score = calculate_investor_match_score(investor, firm)
-
-        matches.append({
-            "firm": {
-                "name": firm.name,
-                "email": firm.email,
-                "industry": firm.industry,
-                "location": firm.location,
-                "num_investments": firm.num_investments
-            },
-            "match_score": score
-        })
-
-    # Sort by score descending
-    matches.sort(key=lambda x: x["match_score"], reverse=True)
-
-    return matches[:5]

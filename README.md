@@ -1,17 +1,16 @@
 # 🦈 Shark Finder
 
-**Shark Finder** is a web application that connects **investors** and **startups/firms** through an **advanced AI-powered matching algorithm**.  
+**Shark Finder** is a web application that connects **investors** and **startups/firms** through a **scored matching algorithm**, with **AI-assisted onboarding** for startups.  
 Our platform helps startups find the right investors for their stage, industry, and funding goals — while enabling investors to discover high-potential ventures that align with their portfolio interests.
 
 ---
 
 ## 🚀 Features
 
-- 🤝 **Smart Matching Algorithm** — uses AI to connect investors with startups based on goals, sectors, and metrics
-- 🧠 **AI-Driven Insights** — powered by **Google Gemini** and **faster-whisper** for intelligent recommendations and data analysis
-- 💬 **Seamless Communication** — in-app chat and profile discovery for easy investor-founder interactions
-- 📊 **Dynamic Dashboards** — visualize funding opportunities and connections in real time
-- ☁️ **Scalable Backend** — built with FastAPI and Supabase for speed and reliability
+- 🤝 **Scored matching** — compares investor and firm profiles (industry, risk, stage, size, location and more) and shows each side their top 5 matches. See [how matching works](docs/matching.md)
+- 🎙️ **AI-assisted onboarding** — a firm records a short pitch; **faster-whisper** transcribes it and **Google Gemini** extracts the profile fields
+- 🔐 **Role-based sign-in** — investors and firms sign up and sign in with AWS Cognito. See [authentication](docs/auth.md)
+- ☁️ **Backend** — FastAPI and Postgres (Supabase), with Alembic migrations
 
 ---
 
@@ -25,16 +24,27 @@ Our platform helps startups find the right investors for their stage, industry, 
 ### Backend
 
 - **FastAPI** — lightweight and high-performance Python framework
-- **Supabase** — database, authentication, and storage
+- **Supabase** — hosted Postgres database (any Postgres works)
+- **Alembic** — database migrations
+- **AWS Cognito** (via Amplify) — sign-up, sign-in and login tokens
 - **faster-whisper** — speech-to-text for the recorded pitch
 - **Google Gemini API** — extracts structured firm details from the transcript
 
 ---
 
+## 📚 Documentation
+
+- [Architecture](docs/architecture.md) — components, main flows and the API endpoint list
+- [How matching works](docs/matching.md) — every scoring rule and its quirks
+- [Authentication and roles](docs/auth.md) — sign-in flow, token checks, and what a new Cognito pool needs
+- API reference: run the backend and open http://localhost:8000/docs
+
 ## 📁 Layout
 
 ```
-backend/    FastAPI app (main.py), models + matching in app/, SQL migrations, dev scripts
+docs/       architecture, matching and auth notes
+backend/    FastAPI app: main.py (wiring), app/routers/ (endpoints), app/services/ (Whisper + Gemini),
+            app/match.py (scoring), app/auth.py (Cognito token check), app/models/, alembic/ (migrations), tests/
 frontend/   React + Vite + Tailwind; auth via AWS Amplify (Cognito)
 docker-compose.yml   runs both services
 ```
@@ -44,16 +54,22 @@ docker-compose.yml   runs both services
 | Setting | Where | Default / notes |
 | --- | --- | --- |
 | `DATABASE_URL` | `backend/.env` | Postgres URL. Unset = local SQLite at `backend/app/dev.db` |
-| `GEMINI_API_KEY` | `backend/.env` | Required; backend won't start without it |
-| Whisper model size | `backend/main.py` (`WHISPER_SIZE`) | `small`, hardcoded |
-| CORS origins | `backend/main.py` | `localhost:5173` / `127.0.0.1:5173`, hardcoded |
-| API base URL | `frontend/services/api-client.ts` | `http://127.0.0.1:8000/`, hardcoded |
-| Cognito pool + client IDs | `frontend/src/main.tsx` | hardcoded; `frontend/amplify_outputs.json` is also imported by `frontend/src/amplify.ts` and is currently a stub |
+| `GEMINI_API_KEY` | `backend/.env` | Secret. Required for firm recordings; read on first use, so the app starts without it |
+| `GEMINI_MODEL` | `backend/.env` | `gemini-2.5-flash` |
+| `WHISPER_SIZE` | `backend/.env` | `small`. The model loads on the first recording (slow once) |
+| `CORS_ORIGINS` | `backend/.env` | Comma-separated. `http://localhost:5173,http://127.0.0.1:5173` |
+| `COGNITO_REGION`, `COGNITO_USER_POOL_ID`, `COGNITO_CLIENT_ID` | `backend/.env` | Public IDs used to verify login tokens. Default to the current pool |
+| `VITE_API_URL` | `frontend/.env` | Backend URL. `http://127.0.0.1:8000/` |
+| `VITE_COGNITO_USER_POOL_ID`, `VITE_COGNITO_CLIENT_ID` | `frontend/.env` | Must match the backend `COGNITO_*` values. Default to the current pool |
 
-Secrets live only in `backend/.env` (git-ignored). Start from the template:
+All settings are optional except the Gemini key. Only `GEMINI_API_KEY` and a Postgres `DATABASE_URL` are secrets; the Cognito IDs are public.
+Backend code reads everything through `backend/app/config.py`.
+
+Secrets live only in `backend/.env` (git-ignored). Start from the templates:
 
 ```bash
 cp backend/.env.example backend/.env
+cp frontend/.env.example frontend/.env   # optional
 ```
 
 ## ▶️ Run locally
@@ -63,6 +79,7 @@ Backend (needs `ffmpeg` installed):
 ```bash
 cd backend && python3 -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
+python -m app.migrate        # create/upgrade the database tables
 uvicorn main:app --reload
 ```
 
@@ -72,7 +89,7 @@ Frontend:
 cd frontend && npm ci && npm run dev
 ```
 
-Or with Docker (reads `backend/.env`):
+Or with Docker (reads `backend/.env`; the backend container runs the migrations on start):
 
 ```bash
 docker compose up --build
@@ -80,7 +97,26 @@ docker compose up --build
 
 App: http://localhost:5173 · API: http://localhost:8000
 
-## 🛠 Database scripts
+## 🗄 Database migrations
 
-- `backend/migrations/0001_investors_uuid_migration.sql` — converts `investors.id` from integer to UUID. **Postgres only; back up first.**
-- `backend/scripts/reset_investors_table.py` — **drops and recreates all tables.** Development only.
+The schema is managed with Alembic (`backend/alembic/`). From `backend/`:
+
+```bash
+python -m app.migrate                              # bring the database up to date (what Docker runs on start)
+alembic revision --autogenerate -m "describe it"   # after changing a model; review the generated file
+alembic downgrade base && python -m app.migrate    # dev only: rebuild an empty local database
+```
+
+A database created before Alembic (tables made by the old `create_all`) is detected and stamped at the baseline
+revision instead of being re-created, so it is safe to run `python -m app.migrate` against it. Back up first.
+Column types are not compared on SQLite, so check autogenerated migrations by hand.
+
+## ✅ Tests
+
+```bash
+cd backend && pip install -r requirements-dev.txt && python -m pytest   # temp SQLite DB, no Gemini key or Whisper needed
+cd frontend && npm test                                                 # unit tests for src/lib
+cd frontend && npm run build                                            # typecheck + production build
+```
+
+GitHub Actions (`.github/workflows/ci.yml`) runs the backend tests and the frontend tests and build on every push and PR.
